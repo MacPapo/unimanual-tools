@@ -1,0 +1,4 @@
+#+title: UniManual Tools
+#+author: Jacopo Costantini
+
+UniManual Tools is a set of Elisp funcs for UniManual Management!
