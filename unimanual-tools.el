@@ -51,11 +51,31 @@
   (interactive
    "FGive me the index.html in the /docs file: ")
   (let ((uri (format "file://%s" (expand-file-name file))))
-    (make-frame '((name . "UniManual")
-                  (width . 100)
-                  (height . 75)))
-    (select-frame-by-name "UniManual")
-    (xwidget-webkit-goto-url uri)))
+    (if (eql (select-frame-by-name "xUniManual") nil)
+        (message "NON ESISTE")
+      (make-frame '((name . "xUniManual")
+                    (width . 100)
+                    (height . 75))))
+    (select-frame-by-name "xUniManual")
+    ))
+
+(defun unimanual-view-current-file ()
+  "Save and View in default browser the current file buffer already exported."
+  (interactive)
+  (save-buffer)
+  (org-twbs-export-to-html)
+  (let* ((file-name (concat (file-name-base (buffer-name)) ".html"))
+         (origin-path (expand-file-name file-name))
+         (out-name (change-path (url-file-directory (expand-file-name file-name))))
+         (out-path (concat out-name file-name)))
+    (if (file-exists-p out-path)
+        (delete-file out-path))
+    (rename-file origin-path out-path nil)
+    (browse-url-default-macosx-browser (format "file://%s" out-path))))
+
+(defun change-path (file-path)
+  "Correct the FILE-PATH to docs."
+  (replace-regexp-in-string "src" "docs" file-path))
 
 (provide 'unimanual-tools)
 ;;; unimanual-tools.el ends here
