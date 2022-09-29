@@ -42,9 +42,26 @@
   "Find all .org files in DIR."
   (let ((files (directory-files-recursively dir "\\.org$" t nil)))
     (dolist (file files)
-      (rename-file file (concat (url-file-directory file)
-                                (uni-format-name file)
-                                ".org")))))
+      (let* ((orig (format "%s.org"
+                           (file-name-base file)))
+             (dest (concat (url-file-directory file)
+                           (uni-format-name file)
+                           ".org"))
+             (dest-name (format "%s.org"
+                                (file-name-base dest))))
+        (unless (string-equal orig dest-name)
+          (if (bufferp (get-buffer orig))
+              (progn
+                (save-current-buffer
+                  (set-buffer (get-buffer orig))
+                  (rename-file file dest t)
+                  (rename-buffer dest t)
+                  (message "File and Buffer renamed from %s to %s" orig
+                           (format "%s.org"
+                                   (file-name-base dest)))))
+            (message "File renamed from %s to %s" orig
+                     (format "%s.org"
+                             (file-name-base dest)))))))))
 
 (defun unimanual-test-result (file)
   "Test the exported html FILE and links in the xwidget buffer."
