@@ -28,71 +28,54 @@
 
 ;; Convert snake_case org files to kebab-case
 (defun unimanual-apply-name-scheme (dir)
-  "Take all files from DIR and rename it with the kebab-case standard."
+  "Take all org files from DIR and rename it in kebab-case."
   (interactive
    "DSelect a directory to analyze: ")
-  (message "Dir: %s" dir)
-  (uni-mark-format dir))
-
-(defun uni-format-name (str)
-  "Uni format string STR."
-  (downcase (replace-regexp-in-string "_" "-" (file-name-base str))))
+  (let* ((files (uni-mark-format dir)))
+    (dolist (file files)
+      (message "%s" file)
+      (let ((new-name (expand-file-name (uni-format-name
+                                         (file-name-nondirectory file)))))
+        (message "%s" new-name)
+        (uni-save-new-file-name file new-name)))))
 
 (defun uni-mark-format (dir)
-  "Find all .org files in DIR."
-  (let ((files (directory-files-recursively dir "\\.org$" t nil)))
-    (dolist (file files)
-      (let* ((orig (format "%s.org"
-                           (file-name-base file)))
-             (dest (concat (url-file-directory file)
-                           (uni-format-name file)
-                           ".org"))
-             (dest-name (format "%s.org"
-                                (file-name-base dest))))
-        (unless (string-equal orig dest-name)
-          (if (bufferp (get-buffer orig))
-              (progn
-                (save-current-buffer
-                  (set-buffer (get-buffer orig))
-                  (rename-file file dest t)
-                  (rename-buffer dest t)
-                  (message "File and Buffer renamed from %s to %s" orig
-                           (format "%s.org"
-                                   (file-name-base dest)))))
-            (message "File renamed from %s to %s" orig
-                     (format "%s.org"
-                             (file-name-base dest)))))))))
+  "Find all .org files in DIR recursively and return it in a list."
+  (directory-files-recursively dir "\\.org$" t nil))
 
-(defun unimanual-test-result (file)
-  "Test the exported html FILE and links in the xwidget buffer."
-  (interactive
-   "FGive me the index.html in the /docs file: ")
-  (let ((uri (format "file://%s" (expand-file-name file))))
-    (if (eql (select-frame-by-name "xUniManual") nil)
-        (message "NON ESISTE")
-      (make-frame '((name . "xUniManual")
-                    (width . 100)
-                    (height . 75))))
-    (select-frame-by-name "xUniManual")
-    ))
+(defun uni-format-name (name)
+  "Downcase and replace all _ with - in NAME."
+  (downcase (replace-regexp-in-string "_" "-" name)))
+
+(defun uni-save-new-file-name (old-file-name new-file-name)
+  "Compare OLD-FILE-NAME with NEW-FILE-NAME.
+If the name is different save it as NEW-FILE-NAME and change
+also the buffer name if exists."
+  (unless (string= old-file-name new-file-name)
+    (rename-file old-file-name new-file-name t)
+    (unless (not (bufferp (get-buffer
+                           (file-name-nondirectory old-file-name))))
+      (with-current-buffer (current-buffer)
+        (set-buffer (get-buffer
+                     (file-name-nondirectory old-file-name)))
+        (set-visited-file-name
+         (file-name-nondirectory new-file-name) t t)))))
 
 (defun unimanual-view-current-file ()
   "Save and View in default browser the current file buffer already exported."
   (interactive)
   (save-buffer)
   (org-twbs-export-to-html)
-  (let* ((file-name (concat (file-name-base (buffer-name)) ".html"))
-         (origin-path (expand-file-name file-name))
-         (out-name (change-path (url-file-directory (expand-file-name file-name))))
-         (out-path (concat out-name file-name)))
-    (if (file-exists-p out-path)
-        (delete-file out-path))
-    (rename-file origin-path out-path nil)
-    (browse-url-default-macosx-browser (format "file://%s" out-path))))
+  (let* ((file-name (s-replace ".org" ".html" (buffer-file-name)))
+         (dest-name (uni-change-path file-name)))
+    (unless (not (file-exists-p dest-name))
+      (delete-file dest-name))
+    (uni-save-new-file-name file-name dest-name)
+    (browse-url-default-macosx-browser (format "file://%s" dest-name))))
 
-(defun change-path (file-path)
+(defun uni-change-path (file-path)
   "Correct the FILE-PATH to docs."
-  (replace-regexp-in-string "src" "docs" file-path))
+  (replace-regexp-in-string "/UniManual/src" "/UniManual/docs" file-path))
 
 (provide 'unimanual-tools)
 ;;; unimanual-tools.el ends here
