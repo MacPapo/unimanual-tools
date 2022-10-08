@@ -31,11 +31,12 @@
   "Take all org files from DIR and rename it in kebab-case."
   (interactive
    "DSelect a directory to analyze: ")
-  (let* ((files (uni-mark-format dir)))
+  (let ((files (uni-mark-format dir)))
     (dolist (file files)
       (message "%s" file)
-      (let ((new-name (expand-file-name (uni-format-name
-                                         (file-name-nondirectory file)))))
+      (let ((new-name (expand-file-name
+                       (uni-format-name
+                        (file-name-nondirectory file)))))
         (message "%s" new-name)
         (uni-save-new-file-name file new-name)))))
 
@@ -61,8 +62,16 @@ also the buffer name if exists."
         (set-visited-file-name
          (file-name-nondirectory new-file-name) t t)))))
 
+(defun unimanual-open-index-preview ()
+  "Open in Safari the UniManual index html."
+  (interactive)
+  (unless (not (string= "UniManual" (projectile-project-name)))
+    (let ((index-name (projectile-expand-root "docs/index.html")))
+      (browse-url-default-macosx-browser
+       (format "file://%s" index-name)))))
+
 (defun unimanual-view-current-file ()
-  "Save and View in default browser the current file buffer already exported."
+  "Save and View in Safari the current file buffer already exported."
   (interactive)
   (save-buffer)
   (org-twbs-export-to-html)
