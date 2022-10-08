@@ -2,3 +2,21 @@
 #+author: Jacopo Costantini
 
 UniManual Tools is a set of Elisp funcs for UniManual Management!
+
+* unimanual-export
+
+Esport all .org files to html and move it to the corresponding docs
+directory.
+
+* unimanual-apply-name-scheme
+
+Rename all the .org files from current dir recursively from snake_case
+to kebab-case
+
+* unimanual-open-index-preview
+
+Open index.html from UniManual project directory in Safari.
+
+* unimanual-view-current-file
+
+Save and View in Safari the current buffer file exported to html.

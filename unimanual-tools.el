@@ -8,7 +8,6 @@
 
 (require 'ox-twbs)
 (require 'ox-publish)
-(require 'xwidget)
 
 ;; Buffer Dynamic export
 (defun unimanual-export (dir out)
