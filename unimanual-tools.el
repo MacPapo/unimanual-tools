@@ -7,10 +7,90 @@
 ;;; Code:
 
 (require 'ox-twbs)
+(require 'ox-md)
 (require 'ox-publish)
 
 ;; Buffer Dynamic export
-(defun unimanual-export (dir out)
+(defun unimanual-export-md (dir out)
+  "Export all org files to md from DIR to OUT."
+  (interactive
+   "DSelect a directory to export: \nDSelect the destination: ")
+  (message "DIR: %s OUT: %s" dir out)
+  (pre-export-md dir)
+  (setq-local org-publish-project-alist
+              `(("UniManual"
+                 :base-directory ,(format "%s" dir)
+                 :publishing-directory ,(format "%s" out)
+                 :publishing-function org-md-publish-to-md
+                 :with-sub-superscript nil
+                 :recursive t
+                 )))
+  (org-publish-remove-all-timestamps) ;; overwrite old files
+  (org-publish-project "UniManual")
+  (format-exported-md out))
+
+(defun format-exported-md (dir)
+  "Prepend timestamp to all .md exported files in DIR recursively."
+  (let ((file-list (directory-files-recursively dir "\\.md$" t nil)))
+    (dolist (file file-list)
+      (let* ((time (format-time-string "%Y-%m-%d"))
+             (new-name (format "%s/%s"
+                               (file-name-directory file)
+                               (format "%s-%s"
+                                       time
+                                       (file-name-nondirectory
+                                        file)))))
+        (rename-file file new-name t)
+        (with-current-buffer (current-buffer)
+          (set-buffer (find-file-noselect new-name))
+          (message "%s" (current-buffer))
+          (attach-front-matter)
+          (save-excursion
+            (convert-img-link))
+          (save-buffer)
+          (kill-buffer (current-buffer)))))))
+
+(defun attach-front-matter ()
+  "Insert Front Matter for Jekyll at the beginning of the buffer."
+  (beginning-of-buffer)
+  (insert
+   "---\n"
+   "layout: post\n"
+   "title: !TITLE\n"
+   "date: " (concat (format-time-string "%Y-%m-%d %H:%M:%S %z") "\n")
+   "categories: [!CATEGO]\n"
+   "tags: [!TAG]\n"
+   "math: true\n"
+   "---\n\n"))
+
+(defun pre-export-md (dir)
+  "Disable TOC in all org files in the DIR."
+  (let ((file-list (directory-files-recursively dir "\\.org$" t nil)))
+    (dolist (file file-list)
+      (with-current-buffer (current-buffer)
+        (set-buffer (find-file-noselect file))
+        (beginning-of-buffer)
+        (unless (search-forward
+                 "#+OPTIONS: toc:nil author:t date:t num:nil" nil t)
+          (or (search-forward "#+AUTHOR")
+              (search-forward "#+author"))
+          (end-of-line)
+          (newline)
+          (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
+          (save-buffer))
+        (kill-buffer (current-buffer))))))
+
+(defun convert-img-link ()
+  "Convert path from the current file into /assets Jekyll forlder."
+  (while (or (search-forward "![img](../img" nil t)
+             (search-forward "![img](../../img" nil t))
+    (message "Hey ecco una immagine al punto %d" (point))
+    (beginning-of-line)
+    (replace-match "![img](/assets/img")))
+
+
+;; Buffer Dynamic export
+(defun unimanual-export-html (dir out)
   "Export all org files to html from DIR to OUT."
   (interactive
    "DSelect a directory to export: \nDSelect the destination: ")
@@ -79,11 +159,15 @@ also the buffer name if exists."
     (unless (not (file-exists-p dest-name))
       (delete-file dest-name))
     (uni-save-new-file-name file-name dest-name)
-    (browse-url-default-macosx-browser (format "file://%s" dest-name))))
+    (browse-url-default-macosx-browser
+     (format "file://%s" dest-name))))
 
 (defun uni-change-path (file-path)
   "Correct the FILE-PATH to docs."
-  (replace-regexp-in-string "/UniManual/src" "/UniManual/docs" file-path))
+  (replace-regexp-in-string
+   "/UniManual/src"
+   "/UniManual/docs"
+   file-path))
 
 (provide 'unimanual-tools)
 ;;; unimanual-tools.el ends here
