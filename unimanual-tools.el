@@ -69,16 +69,24 @@
     (dolist (file file-list)
       (with-current-buffer (current-buffer)
         (set-buffer (find-file-noselect file))
+        (delete-matching-lines "startup: latex")
         (beginning-of-buffer)
         (unless (search-forward
                  "#+OPTIONS: toc:nil author:t date:t num:nil" nil t)
-          (or (search-forward "#+AUTHOR")
-              (search-forward "#+author"))
+          (or (search-forward "#+AUTHOR" nil t)
+              (search-forward "#+TITLE" nil t))
           (end-of-line)
           (newline)
           (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
-          (save-buffer))
+          (beginning-of-buffer))
+        (save-buffer)
         (kill-buffer (current-buffer))))))
+
+(defun prepere-org-to-md (dir)
+  "Disable TOC in all org files in the DIR."
+  (interactive
+   "DSelect a directory: ")
+  (pre-export-md dir))
 
 (defun convert-img-link ()
   "Convert path from the current file into /assets Jekyll forlder."
