@@ -17,6 +17,7 @@
    "DSelect a directory to export: \nDSelect the destination: ")
   (message "DIR: %s OUT: %s" dir out)
   (pre-export-md dir)
+  (uni-purge-dir out)
   (setq-local org-publish-project-alist
               `(("UniManual"
                  :base-directory ,(format "%s" dir)
@@ -33,22 +34,33 @@
   "Prepend timestamp to all .md exported files in DIR recursively."
   (let ((file-list (directory-files-recursively dir "\\.md$" t nil)))
     (dolist (file file-list)
-      (let* ((time (format-time-string "%Y-%m-%d"))
+      (let* ((template "template")
+             (time (format-time-string "%Y-%m-%d"))
              (new-name (format "%s/%s"
                                (file-name-directory file)
                                (format "%s-%s"
                                        time
                                        (file-name-nondirectory
                                         file)))))
-        (rename-file file new-name t)
-        (with-current-buffer (current-buffer)
-          (set-buffer (find-file-noselect new-name))
-          (message "%s" (current-buffer))
-          (attach-front-matter)
-          (save-excursion
-            (convert-img-link))
-          (save-buffer)
-          (kill-buffer (current-buffer)))))))
+        (unless (file-equal-p file template)
+          (rename-file file new-name t)
+          (with-current-buffer (current-buffer)
+            (set-buffer (find-file-noselect new-name))
+            (beginning-of-buffer)
+            (attach-front-matter)
+            (save-excursion
+              (convert-img-link))
+            (save-buffer)
+            (kill-buffer (current-buffer))))))))
+
+(defun uni-purge-dir (dir)
+  "Delete all files in DIR."
+  (let ((file-list (directory-files-recursively dir "\\.md$" t nil))
+        (template "template"))
+    (message "OUT: %s" dir)
+    (dolist (file file-list)
+      (unless (file-equal-p file template)
+        (delete-file file)))))
 
 (defun attach-front-matter ()
   "Insert Front Matter for Jekyll at the beginning of the buffer."
@@ -58,8 +70,6 @@
    "layout: post\n"
    "title: !TITLE\n"
    "date: " (concat (format-time-string "%Y-%m-%d %H:%M:%S %z") "\n")
-   "categories: [!CATEGO]\n"
-   "tags: [!TAG]\n"
    "math: true\n"
    "---\n\n"))
 
@@ -82,6 +92,28 @@
         (save-buffer)
         (kill-buffer (current-buffer))))))
 
+(defun uni-apply-template (dir)
+  (interactive
+   "DInsert directory: ")
+  (message "DIR: %s" dir)
+  (let ((template "template")
+        (file-list (directory-files-recursively dir "\\.md$" t nil)))
+    (with-current-buffer (current-buffer)
+      (set-buffer (find-file-noselect template))
+      (copy-region-as-kill (point-min) (point-max))
+      (dolist (file file-list)
+        (set-buffer (find-file-noselect file))
+        (beginning-of-buffer)
+        (if (search-forward "date:" nil t)
+            (progn
+              (end-of-line)
+              (newline)
+              (yank)
+              (delete-blank-lines)
+              (save-buffer))
+          (error "ATTENZIONE ERRORE!!"))
+        (kill-buffer (current-buffer))))))
+
 (defun prepere-org-to-md (dir)
   "Disable TOC in all org files in the DIR."
   (interactive
@@ -96,6 +128,7 @@
     (beginning-of-line)
     (replace-match "![img](/assets/img")))
 
+;; TODO - auto catego and tag
 
 ;; Buffer Dynamic export
 (defun unimanual-export-html (dir out)
