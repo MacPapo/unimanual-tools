@@ -79,18 +79,22 @@
     (dolist (file file-list)
       (with-current-buffer (current-buffer)
         (set-buffer (find-file-noselect file))
-        (delete-matching-lines "startup: latex")
-        (beginning-of-buffer)
-        (unless (search-forward
-                 "#+OPTIONS: toc:nil author:t date:t num:nil" nil t)
-          (or (search-forward "#+AUTHOR" nil t)
-              (search-forward "#+TITLE" nil t))
-          (end-of-line)
-          (newline)
-          (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
-          (beginning-of-buffer))
-        (save-buffer)
+        (uni-prepare-org-to-export-md)
         (kill-buffer (current-buffer))))))
+
+(defun uni-prepare-org-to-export-md ()
+  "Prepare org to be exported in md."
+  (delete-matching-lines "startup: latex")
+  (beginning-of-buffer)
+  (unless (search-forward
+           "#+OPTIONS: toc:nil" nil t)
+    (or (search-forward "#+AUTHOR" nil t)
+        (search-forward "#+TITLE" nil t))
+    (end-of-line)
+    (newline)
+    (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
+    (save-buffer))
+  (beginning-of-buffer))
 
 (defun uni-apply-template (dir)
   (interactive
@@ -120,6 +124,30 @@
    "DSelect a directory: ")
   (pre-export-md dir))
 
+(defun export-current-org-to-md-post ()
+  "EXPORT."
+  (interactive)
+  (unless (not (string= "org"
+                        (file-name-extension (buffer-file-name))))
+    (uni-prepare-org-to-export-md)
+    (message "File pronto per essere exsportato!")
+    (org-md-export-to-markdown)
+    (with-current-buffer (current-buffer)
+      (let* ((md-file (s-replace ".org" ".md" (buffer-file-name)))
+             (tmd-file (concat
+                        (s-replace-regexp "org-content"
+                                          "_posts"
+                                          (file-name-directory md-file))
+                        (concat
+                         (format-time-string "%Y-%m-%d")
+                         "-"
+                         (file-name-nondirectory md-file)))))
+        (rename-file md-file tmd-file)
+        (set-buffer (find-file-noselect tmd-file))
+        (attach-front-matter)
+        (save-buffer)
+        (kill-buffer (current-buffer))))))
+
 (defun convert-img-link ()
   "Convert path from the current file into /assets Jekyll forlder."
   (while (or (search-forward "![img](../img" nil t)
@@ -128,7 +156,26 @@
     (beginning-of-line)
     (replace-match "![img](/assets/img")))
 
-;; TODO - auto catego and tag
+(defun uni-spawn-all-links ()
+  "CAIO."
+  (interactive)
+  (let ((file-list (directory-files-recursively
+                    (file-name-directory (buffer-file-name))
+                    "\\.md$" t nil)))
+    (dolist (file file-list)
+      (let ((link (file-name-base file)))
+        (unless (string= link
+                         (file-name-base (buffer-name)))
+          (let ((link-name (s-capitalized-words
+                            (replace-regexp-in-string
+                             "[[:digit:]_-]"
+                             " "
+                             link))))
+            (insert "- [" link-name "]"
+                    "({% post_url "
+                    link
+                    " %})"
+                    "\n")))))))
 
 ;; Buffer Dynamic export
 (defun unimanual-export-html (dir out)
