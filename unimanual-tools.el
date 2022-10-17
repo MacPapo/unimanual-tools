@@ -75,7 +75,10 @@
 
 (defun pre-export-md (dir)
   "Disable TOC in all org files in the DIR."
-  (let ((file-list (directory-files-recursively dir "\\.org$" t nil)))
+  (let ((file-list (directory-files-recursively dir
+                                                "\\.org$"
+                                                t
+                                                nil)))
     (dolist (file file-list)
       (with-current-buffer (current-buffer)
         (set-buffer (find-file-noselect file))
@@ -97,26 +100,49 @@
   (beginning-of-buffer))
 
 (defun uni-apply-template (dir)
+  "Apply template in all files in DIR."
   (interactive
    "DInsert directory: ")
-  (message "DIR: %s" dir)
-  (let ((template "template")
-        (file-list (directory-files-recursively dir "\\.md$" t nil)))
+  (let ((file-list (directory-files-recursively dir "\\.md$" t nil)))
     (with-current-buffer (current-buffer)
-      (set-buffer (find-file-noselect template))
-      (copy-region-as-kill (point-min) (point-max))
+      (apply-template)
       (dolist (file file-list)
         (set-buffer (find-file-noselect file))
-        (beginning-of-buffer)
-        (if (search-forward "date:" nil t)
-            (progn
-              (end-of-line)
-              (newline)
-              (yank)
-              (delete-blank-lines)
-              (save-buffer))
-          (error "ATTENZIONE ERRORE!!"))
+        (paste-template)
         (kill-buffer (current-buffer))))))
+
+(defun apply-template ()
+  "Select the template and yank it to the kill ring."
+  (with-current-buffer (current-buffer)
+    (set-buffer (find-file-noselect (concat (correct-path-template)
+                                            "template") t))
+    (copy-region-as-kill (point-min) (point-max))))
+
+(defun correct-path-template ()
+  (let ((path default-directory))
+    (if (or (string-match-p "/mod1/" path)
+            (string-match-p "/mod2/" path))
+        (progn
+          (if (string-match-p "/mod1/" path)
+              (s-replace-regexp "/mod1/"
+                                "/"
+                                path)
+            (s-replace-regexp "/mod2/"
+                              "/"
+                              path)))
+      path)))
+
+(defun paste-template ()
+  "Paste in the correct spot the already yanked template."
+  (beginning-of-buffer)
+  (if (search-forward "date:" nil t)
+      (progn
+        (end-of-line)
+        (newline)
+        (message "%s" (current-kill 0))
+        (yank)
+        (delete-blank-lines))
+    (error "ATTENZIONE ERRORE!!")))
 
 (defun prepere-org-to-md (dir)
   "Disable TOC in all org files in the DIR."
@@ -124,8 +150,13 @@
    "DSelect a directory: ")
   (pre-export-md dir))
 
+(defun attach-template ()
+  "APPLY TEMPLATE."
+  (apply-template)
+  (paste-template))
+
 (defun export-current-org-to-md-post ()
-  "EXPORT."
+  "EXPORT TODO PRENDI IL TITOLO."
   (interactive)
   (unless (not (string= "org"
                         (file-name-extension (buffer-file-name))))
@@ -133,7 +164,8 @@
     (message "File pronto per essere exsportato!")
     (org-md-export-to-markdown)
     (with-current-buffer (current-buffer)
-      (let* ((md-file (s-replace ".org" ".md" (buffer-file-name)))
+      (let* ((title (find-title-org))
+             (md-file (s-replace ".org" ".md" (buffer-file-name)))
              (tmd-file (concat
                         (s-replace-regexp "org-content"
                                           "_posts"
@@ -142,11 +174,49 @@
                          (format-time-string "%Y-%m-%d")
                          "-"
                          (file-name-nondirectory md-file)))))
+        (if (file-exists-p tmd-file)
+            (progn
+              (let ((b-name (file-name-nondirectory tmd-file)))
+                (if (bufferp (get-buffer b-name))
+                    (kill-buffer b-name))
+                (delete-file tmd-file))))
         (rename-file md-file tmd-file)
-        (set-buffer (find-file-noselect tmd-file))
+        (set-buffer (find-file-noselect tmd-file t))
         (attach-front-matter)
+        (attach-template)
+        (attach-title title)
         (save-buffer)
+        (message "Current buffer %s" (buffer-file-name))
         (kill-buffer (current-buffer))))))
+
+(defun uni-open-md-out ()
+  "OPEN MD FILE."
+  (interactive)
+  (if (string= "org"
+               (file-name-extension (buffer-file-name)))
+      (progn
+        (find-file-other-frame (car (directory-files
+                                     (s-replace-regexp "org-content"
+                                                       "_posts"
+                                                       (file-name-directory
+                                                        (buffer-file-name)))
+                                     t
+                                     (concat
+                                      (file-name-base (buffer-file-name))
+                                      ".md")))))
+    (error "This is not an org buffer!! IDIOT!")))
+
+(defun find-title-org ()
+  "GET TITLE."
+  (beginning-of-buffer)
+  (search-forward "#+title: ")
+  (buffer-substring (point) (line-end-position)))
+
+(defun attach-title (str)
+  "STR."
+  (beginning-of-buffer)
+  (if (search-forward "!TITLE" nil t)
+      (replace-match str)))
 
 (defun convert-img-link ()
   "Convert path from the current file into /assets Jekyll forlder."
@@ -157,7 +227,7 @@
     (replace-match "![img](/assets/img")))
 
 (defun uni-spawn-all-links ()
-  "CAIO."
+  "Spawn all links in the Markdown buffer."
   (interactive)
   (let ((file-list (directory-files-recursively
                     (file-name-directory (buffer-file-name))
