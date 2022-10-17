@@ -164,18 +164,21 @@
                     "\\.md$" t nil)))
     (dolist (file file-list)
       (let ((link (file-name-base file)))
-        (unless (string= link
-                         (file-name-base (buffer-name)))
-          (let ((link-name (s-capitalized-words
-                            (replace-regexp-in-string
-                             "[[:digit:]_-]"
-                             " "
-                             link))))
-            (insert "- [" link-name "]"
-                    "({% post_url "
-                    link
-                    " %})"
-                    "\n")))))))
+        (save-excursion
+          (unless (or (string= link
+                               (file-name-base (buffer-name)))
+                      (or (search-forward link nil t)
+                          (search-backward link nil t)))
+            (let ((link-name (s-capitalized-words
+                              (replace-regexp-in-string
+                               "[[:digit:]_-]"
+                               " "
+                               link))))
+              (insert "- [" link-name "]"
+                      "({% post_url "
+                      link
+                      " %})"
+                      "\n"))))))))
 
 ;; Buffer Dynamic export
 (defun unimanual-export-html (dir out)
