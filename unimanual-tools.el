@@ -164,8 +164,8 @@
     (message "File pronto per essere exsportato!")
     (org-md-export-to-markdown)
     (with-current-buffer (current-buffer)
-      (let* ((title (find-title-org))
-             (md-file (s-replace ".org" ".md" (buffer-file-name)))
+      (let* ((origin-name (buffer-file-name))
+             (md-file (s-replace ".org" ".md" origin-name))
              (tmd-file (concat
                         (s-replace-regexp "org-content"
                                           "_posts"
@@ -173,21 +173,35 @@
                         (concat
                          (format-time-string "%Y-%m-%d")
                          "-"
-                         (file-name-nondirectory md-file)))))
-        (if (file-exists-p tmd-file)
-            (progn
-              (let ((b-name (file-name-nondirectory tmd-file)))
-                (if (bufferp (get-buffer b-name))
-                    (kill-buffer b-name))
-                (delete-file tmd-file))))
+                         (file-name-nondirectory md-file))))
+             (file-dup (directory-files
+                        (s-replace-regexp "org-content"
+                                          "_posts"
+                                          (file-name-directory
+                                           origin-name))
+                        t
+                        (file-name-nondirectory md-file))))
+        (unless (eq file-dup nil)
+          (dolist (d-file file-dup)
+            (let ((b-name (file-name-nondirectory d-file)))
+              (message "Vorrei eliminalre il file: %s" d-file)
+              (message "Vorrei trovare il buffer: %s" (file-name-nondirectory d-file))
+              (if (bufferp (get-buffer b-name))
+                  (kill-buffer b-name))
+              (delete-file d-file))))
         (rename-file md-file tmd-file)
         (set-buffer (find-file-noselect tmd-file t))
-        (attach-front-matter)
-        (attach-template)
-        (attach-title title)
-        (save-buffer)
+        (uni-attach-all (file-name-nondirectory origin-name))
         (message "Current buffer %s" (buffer-file-name))
         (kill-buffer (current-buffer))))))
+
+(defun uni-attach-all (org-file)
+  "Attach all necessary staff ORG-FILE."
+  (with-current-buffer (current-buffer)
+    (attach-front-matter)
+    (attach-template)
+    (attach-title (find-title-org org-file))
+    (save-buffer)))
 
 (defun uni-open-md-out ()
   "OPEN MD FILE."
@@ -206,11 +220,14 @@
                                       ".md")))))
     (error "This is not an org buffer!! IDIOT!")))
 
-(defun find-title-org ()
-  "GET TITLE."
-  (beginning-of-buffer)
-  (search-forward "#+title: ")
-  (buffer-substring (point) (line-end-position)))
+(defun find-title-org (f)
+  "GET TITLE F."
+  (with-current-buffer (current-buffer)
+    (set-buffer (get-buffer f))
+    (message "CURRENT BUFFER FIND TITLE: %s" (buffer-file-name))
+    (beginning-of-buffer)
+    (search-forward "#+title: " nil t)
+    (buffer-substring (point) (line-end-position))))
 
 (defun attach-title (str)
   "STR."
