@@ -3,6 +3,8 @@
 ;;; Commentary:
 ;;; export all .org files recursively from a selected dir
 ;;; to a selected out with ow-twbs
+;;; TODO - Fix title search
+;;; TODO - auto-update the links
 
 ;;; Code:
 
@@ -119,6 +121,7 @@
     (copy-region-as-kill (point-min) (point-max))))
 
 (defun correct-path-template ()
+  "Correct the path to find the template."
   (let ((path default-directory))
     (if (or (string-match-p "/mod1/" path)
             (string-match-p "/mod2/" path))
@@ -184,8 +187,6 @@
         (unless (eq file-dup nil)
           (dolist (d-file file-dup)
             (let ((b-name (file-name-nondirectory d-file)))
-              (message "Vorrei eliminalre il file: %s" d-file)
-              (message "Vorrei trovare il buffer: %s" (file-name-nondirectory d-file))
               (if (bufferp (get-buffer b-name))
                   (kill-buffer b-name))
               (delete-file d-file))))
@@ -200,6 +201,7 @@
   (with-current-buffer (current-buffer)
     (attach-front-matter)
     (attach-template)
+    (convert-img-link)
     (attach-title (find-title-org org-file))
     (save-buffer)))
 
