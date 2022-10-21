@@ -202,7 +202,9 @@
     (attach-front-matter)
     (attach-template)
     (convert-img-link)
+    (message "BEFORE ATTACH: %s" (buffer-name))
     (attach-title (find-title-org org-file))
+    (message "AFTER ATTACH: %s" (buffer-name))
     (save-buffer)))
 
 (defun uni-open-md-out ()
@@ -222,14 +224,14 @@
                                       ".md")))))
     (error "This is not an org buffer!! IDIOT!")))
 
-(defun find-title-org (f)
-  "GET TITLE F."
-  (with-current-buffer (current-buffer)
-    (set-buffer (get-buffer f))
-    (message "CURRENT BUFFER FIND TITLE: %s" (buffer-file-name))
-    (beginning-of-buffer)
-    (search-forward "#+title: " nil t)
-    (buffer-substring (point) (line-end-position))))
+(defun find-title-org (b)
+  "GET TITLE B."
+  (message "BUFFER TO FIND TITLE: %s" b)
+  (set-buffer (get-buffer b))
+  (message "CURRENT BUFFER FIND TITLE: %s" (buffer-file-name))
+  (beginning-of-buffer)
+  (search-forward "#+title: " nil t)
+  (buffer-substring (point) (line-end-position)))
 
 (defun attach-title (str)
   "STR."
