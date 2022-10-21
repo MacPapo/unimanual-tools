@@ -226,18 +226,17 @@
 
 (defun find-title-org (b)
   "GET TITLE B."
-  (message "BUFFER TO FIND TITLE: %s" b)
-  (set-buffer (get-buffer b))
-  (message "CURRENT BUFFER FIND TITLE: %s" (buffer-file-name))
-  (beginning-of-buffer)
-  (search-forward "#+title: " nil t)
-  (buffer-substring (point) (line-end-position)))
+  (with-current-buffer (current-buffer)
+    (set-buffer (get-buffer b))
+    (beginning-of-buffer)
+    (search-forward "#+title: " nil t)
+    (buffer-substring (point) (line-end-position))))
 
 (defun attach-title (str)
   "STR."
   (beginning-of-buffer)
   (if (search-forward "!TITLE" nil t)
-      (replace-match str)))
+      (replace-match str t)))
 
 (defun convert-img-link ()
   "Convert path from the current file into /assets Jekyll forlder."
