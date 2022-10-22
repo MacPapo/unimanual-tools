@@ -3,7 +3,10 @@
 ;;; Commentary:
 ;;; export all .org files recursively from a selected dir
 ;;; to a selected out with ow-twbs
-;;; TODO - Fix title search
+;;;
+;;; Now UniManual is using jekyll, new functions for easy export org
+;;; file to md.
+;;;
 ;;; TODO - auto-update the links
 
 ;;; Code:
@@ -159,12 +162,11 @@
   (paste-template))
 
 (defun export-current-org-to-md-post ()
-  "EXPORT TODO PRENDI IL TITOLO."
+  "Export current org file to md post in jekyll porjet."
   (interactive)
   (unless (not (string= "org"
                         (file-name-extension (buffer-file-name))))
     (uni-prepare-org-to-export-md)
-    (message "File pronto per essere exsportato!")
     (org-md-export-to-markdown)
     (with-current-buffer (current-buffer)
       (let* ((origin-name (buffer-file-name))
@@ -193,7 +195,6 @@
         (rename-file md-file tmd-file)
         (set-buffer (find-file-noselect tmd-file t))
         (uni-attach-all (file-name-nondirectory origin-name))
-        (message "Current buffer %s" (buffer-file-name))
         (kill-buffer (current-buffer))))))
 
 (defun uni-attach-all (org-file)
@@ -249,26 +250,41 @@
 (defun uni-spawn-all-links ()
   "Spawn all links in the Markdown buffer."
   (interactive)
+  (spawn-post-links))
+
+(defun spawn-post-links ()
+  "Spawn all posts links in jekyll project."
   (let ((file-list (directory-files-recursively
                     (file-name-directory (buffer-file-name))
                     "\\.md$" t nil)))
-    (dolist (file file-list)
-      (let ((link (file-name-base file)))
-        (save-excursion
+    (save-excursion
+      (dolist (file file-list)
+        (let ((link (file-name-base file)))
           (unless (or (string= link
-                               (file-name-base (buffer-name)))
-                      (or (search-forward link nil t)
-                          (search-backward link nil t)))
-            (let ((link-name (s-capitalized-words
-                              (replace-regexp-in-string
-                               "[[:digit:]_-]"
-                               " "
-                               link))))
-              (insert "- [" link-name "]"
-                      "({% post_url "
-                      link
-                      " %})"
-                      "\n"))))))))
+                               (file-name-base (buffer-name))))
+            (let* ((link-name (s-capitalized-words
+                               (replace-regexp-in-string
+                                "[[:digit:]_-]"
+                                " "
+                                link)))
+                   (desc (concat "- ["
+                                 link-name
+                                 "]")))
+              (save-excursion
+                (if (and (or (search-forward desc nil t)
+                             (search-backward desc nil t))
+                         (eq nil (search-forward link nil t)))
+                    (progn
+                      (beginning-of-line)
+                      (delete-line)
+                      (insert desc
+                              "({% post_url "
+                              link
+                              " %})"
+                              "\n"))))))))
+      (save-buffer))))
+
+;; HTML
 
 ;; Buffer Dynamic export
 (defun unimanual-export-html (dir out)
