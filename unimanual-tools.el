@@ -20,7 +20,6 @@
   "Export all org files to md from DIR to OUT."
   (interactive
    "DSelect a directory to export: \nDSelect the destination: ")
-  (message "DIR: %s OUT: %s" dir out)
   (pre-export-md dir)
   (uni-purge-dir out)
   (setq-local org-publish-project-alist
@@ -62,7 +61,6 @@
   "Delete all files in DIR."
   (let ((file-list (directory-files-recursively dir "\\.md$" t nil))
         (template "template"))
-    (message "OUT: %s" dir)
     (dolist (file file-list)
       (unless (file-equal-p file template)
         (delete-file file)))))
@@ -145,7 +143,6 @@
       (progn
         (end-of-line)
         (newline)
-        (message "%s" (current-kill 0))
         (yank)
         (delete-blank-lines))
     (error "ATTENZIONE ERRORE!!")))
@@ -203,9 +200,7 @@
     (attach-front-matter)
     (attach-template)
     (convert-img-link)
-    (message "BEFORE ATTACH: %s" (buffer-name))
     (attach-title (find-title-org org-file))
-    (message "AFTER ATTACH: %s" (buffer-name))
     (save-buffer)))
 
 (defun uni-open-md-out ()
@@ -243,7 +238,6 @@
   "Convert path from the current file into /assets Jekyll forlder."
   (while (or (search-forward "![img](../img" nil t)
              (search-forward "![img](../../img" nil t))
-    (message "Hey ecco una immagine al punto %d" (point))
     (beginning-of-line)
     (replace-match "![img](/assets/img")))
 
@@ -270,19 +264,25 @@
                    (desc (concat "- ["
                                  link-name
                                  "]")))
-              (save-excursion
-                (if (and (or (search-forward desc nil t)
-                             (search-backward desc nil t))
-                         (eq nil (search-forward link nil t)))
-                    (progn
+              (message "DESC: %s" desc)
+              (message "LINK: %s" link)
+              (if (or (search-forward desc nil t)
+                      (search-backward desc nil t))
+                  (progn
+                    (unless (not (search-forward link nil t))
                       (beginning-of-line)
                       (delete-line)
                       (insert desc
                               "({% post_url "
                               link
                               " %})"
-                              "\n"))))))))
-      (save-buffer))))
+                              "\n")))
+                (insert desc
+                        "({% post_url "
+                        link
+                        " %})"
+                        "\n"))))))
+      (if (buffer-modified-p) (save-buffer)))))
 
 ;; HTML
 
@@ -309,11 +309,9 @@
    "DSelect a directory to analyze: ")
   (let ((files (uni-mark-format dir)))
     (dolist (file files)
-      (message "%s" file)
       (let ((new-name (expand-file-name
                        (uni-format-name
                         (file-name-nondirectory file)))))
-        (message "%s" new-name)
         (uni-save-new-file-name file new-name)))))
 
 (defun uni-mark-format (dir)
