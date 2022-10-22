@@ -192,6 +192,13 @@
         (rename-file md-file tmd-file)
         (set-buffer (find-file-noselect tmd-file t))
         (uni-attach-all (file-name-nondirectory origin-name))
+        (with-current-buffer (current-buffer)
+          (set-buffer (find-file-noselect (car (directory-files
+                                                (file-name-directory (buffer-file-name))
+                                                t
+                                                "list.md"))))
+          (spawn-post-links)
+          (kill-buffer (current-buffer)))
         (kill-buffer (current-buffer))))))
 
 (defun uni-attach-all (org-file)
@@ -264,8 +271,6 @@
                    (desc (concat "- ["
                                  link-name
                                  "]")))
-              (message "DESC: %s" desc)
-              (message "LINK: %s" link)
               (if (or (search-forward desc nil t)
                       (search-backward desc nil t))
                   (progn
