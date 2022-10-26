@@ -106,12 +106,12 @@
   "Apply template in all files in DIR."
   (interactive
    "DInsert directory: ")
-  (let ((file-list (directory-files-recursively dir "\\.md$" t nil)))
+  (let ((file-list (directory-files-recursively dir "\\.md$" t nil))
+        (str (apply-template)))
     (with-current-buffer (current-buffer)
-      (apply-template)
       (dolist (file file-list)
         (set-buffer (find-file-noselect file))
-        (paste-template)
+        (paste-template str)
         (kill-buffer (current-buffer))))))
 
 (defun apply-template ()
@@ -119,7 +119,7 @@
   (with-current-buffer (current-buffer)
     (set-buffer (find-file-noselect (concat (correct-path-template)
                                             "template") t))
-    (copy-region-as-kill (point-min) (point-max))))
+    (buffer-substring (point-min) (point-max))))
 
 (defun correct-path-template ()
   "Correct the path to find the template."
@@ -136,14 +136,14 @@
                               path)))
       path)))
 
-(defun paste-template ()
-  "Paste in the correct spot the already yanked template."
+(defun paste-template (str)
+  "STR in the correct spot the already yanked template."
   (beginning-of-buffer)
   (if (search-forward "date:" nil t)
       (progn
         (end-of-line)
         (newline)
-        (yank)
+        (insert str)
         (delete-blank-lines))
     (error "ATTENZIONE ERRORE!!")))
 
@@ -155,8 +155,7 @@
 
 (defun attach-template ()
   "APPLY TEMPLATE."
-  (apply-template)
-  (paste-template))
+  (paste-template (apply-template)))
 
 (defun export-current-org-to-md-post ()
   "Export current org file to md post in jekyll porjet."
@@ -261,8 +260,8 @@
     (save-excursion
       (dolist (file file-list)
         (let ((link (file-name-base file)))
-          (unless (or (string= link
-                               (file-name-base (buffer-name))))
+          (unless (string= link
+                           (file-name-base (buffer-name)))
             (let* ((link-name (s-capitalized-words
                                (replace-regexp-in-string
                                 "[[:digit:]_-]"
@@ -271,22 +270,22 @@
                    (desc (concat "- ["
                                  link-name
                                  "]")))
-              (if (or (search-forward desc nil t)
-                      (search-backward desc nil t))
-                  (progn
-                    (unless (not (search-forward link nil t))
-                      (beginning-of-line)
-                      (delete-line)
-                      (insert desc
-                              "({% post_url "
-                              link
-                              " %})"
-                              "\n")))
-                (insert desc
-                        "({% post_url "
-                        link
-                        " %})"
-                        "\n"))))))
+              (save-excursion
+                (if (or (search-forward desc nil t)
+                        (search-backward desc nil t))
+                    (progn
+                      (unless (search-forward link nil t)
+                        (beginning-of-line)
+                        (kill-whole-line)
+                        (insert desc
+                                "({% post_url "
+                                link
+                                " %})\n")))
+                  (insert desc
+                          "({% post_url "
+                          link
+                          " %})"
+                          "\n")))))))
       (if (buffer-modified-p) (save-buffer)))))
 
 ;; HTML
