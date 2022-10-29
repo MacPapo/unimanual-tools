@@ -10,8 +10,7 @@
 ;;; TODO - auto-update the links
 
 ;;; Code:
-
-(require 'ox-twbs)
+(require 's)
 (require 'ox-md)
 (require 'ox-publish)
 
@@ -38,6 +37,7 @@
   "Prepend timestamp to all .md exported files in DIR recursively."
   (let ((file-list (directory-files-recursively dir "\\.md$" t nil)))
     (dolist (file file-list)
+      (message "FILE BEF: %s" file)
       (let* ((template "template")
              (time (format-time-string "%Y-%m-%d"))
              (new-name (format "%s/%s"
@@ -65,13 +65,14 @@
       (unless (file-equal-p file template)
         (delete-file file)))))
 
-(defun attach-front-matter ()
+(defun uni--attach-front-matter ()
   "Insert Front Matter for Jekyll at the beginning of the buffer."
-  (beginning-of-buffer)
+  (goto-char (point-min))
   (insert
    "---\n"
    "layout: post\n"
    "title: !TITLE\n"
+   "author: !AUTHOR\n"
    "date: " (concat (format-time-string "%Y-%m-%d %H:%M:%S %z") "\n")
    "math: true\n"
    "---\n\n"))
@@ -90,17 +91,15 @@
 
 (defun uni-prepare-org-to-export-md ()
   "Prepare org to be exported in md."
-  (delete-matching-lines "startup: latex")
-  (beginning-of-buffer)
-  (unless (search-forward
-           "#+OPTIONS: toc:nil" nil t)
-    (or (search-forward "#+AUTHOR" nil t)
-        (search-forward "#+TITLE" nil t))
-    (end-of-line)
-    (newline)
-    (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
-    (save-buffer))
-  (beginning-of-buffer))
+  (save-excursion
+    (goto-char (point-min))
+    (unless (search-forward "#+OPTIONS: toc:nil" nil t)
+      (or (search-forward "#+AUTHOR" nil t)
+          (search-forward "#+TITLE" nil t))
+      (end-of-line)
+      (newline)
+      (insert "#+OPTIONS: toc:nil author:t date:t num:nil")
+      (save-buffer))))
 
 (defun uni-apply-template (dir)
   "Apply template in all files in DIR."
@@ -121,7 +120,7 @@
                                             "template") t))
     (buffer-substring (point-min) (point-max))))
 
-(defun correct-path-template ()
+(defun uni--correct-path-template ()
   "Correct the path to find the template."
   (let ((path default-directory))
     (if (or (string-match-p "/mod1/" path)
@@ -188,26 +187,25 @@
               (if (bufferp (get-buffer b-name))
                   (kill-buffer b-name))
               (delete-file d-file))))
-        (rename-file md-file tmd-file)
-        (set-buffer (find-file-noselect tmd-file t))
-        (uni-attach-all (file-name-nondirectory origin-name))
-        (with-current-buffer (current-buffer)
-          (set-buffer (find-file-noselect (car (directory-files
-                                                (file-name-directory (buffer-file-name))
-                                                t
-                                                "list.md"))))
-          (spawn-post-links)
-          (kill-buffer (current-buffer)))
-        (kill-buffer (current-buffer))))))
 
-(defun uni-attach-all (org-file)
-  "Attach all necessary staff ORG-FILE."
-  (with-current-buffer (current-buffer)
-    (attach-front-matter)
-    (attach-template)
-    (convert-img-link)
-    (attach-title (find-title-org org-file))
-    (save-buffer)))
+        (with-current-buffer (current-buffer)
+          (set-buffer (find-file-noselect md-file))
+          (uni--attach-front-matter)
+          (uni--convert-img-link)
+          (uni--attach-title origin-name)
+          (save-buffer)
+          (kill-current-buffer))
+
+        (rename-file md-file tmd-file)
+        (set-buffer (find-file-noselect tmd-file))
+        (with-current-buffer (current-buffer)
+          (set-buffer (find-file-noselect
+                       (car (directory-files
+                             (uni--correct-path-template)
+                             t
+                             "list.md"))))
+          (uni--spawn-post-links)))
+      (kill-buffer (current-buffer)))))
 
 (defun uni-open-md-out ()
   "OPEN MD FILE."
@@ -226,21 +224,50 @@
                                       ".md")))))
     (error "This is not an org buffer!! IDIOT!")))
 
-(defun find-title-org (b)
-  "GET TITLE B."
+(defun uni--attach-title (org)
+  "Take from ORG buffer title and author and insert it."
+  (save-excursion
+    (let ((args (uni--find-title-author org)))
+      (goto-char (point-min))
+      (if (search-forward "!TITLE" nil t)
+          (replace-match (car args) t)
+        (error "No !TITLE found!"))
+      (if (search-forward "!AUTHOR" nil t)
+          (replace-match (nth 1 args) t)
+        (error "No !AUTHOR found!")))))
+
+(defun uni--find-title-author (org)
+  "Find title and author in ORG file."
   (with-current-buffer (current-buffer)
-    (set-buffer (get-buffer b))
-    (beginning-of-buffer)
-    (search-forward "#+title: " nil t)
-    (buffer-substring (point) (line-end-position))))
+    (set-buffer (find-file-noselect org))
+    (goto-char (point-min))
+    (let ((title (if (search-forward "#+title: " nil t)
+                     (progn
+                       (let ((point-bef (point-marker))
+                             (point-end (progn
+                                          (end-of-line)
+                                          (point-marker))))
+                         (buffer-substring-no-properties
+                          point-bef
+                          point-end)))
 
-(defun attach-title (str)
-  "STR."
-  (beginning-of-buffer)
-  (if (search-forward "!TITLE" nil t)
-      (replace-match str t)))
+                   (error "ERROR - TITLE NOT FOUND!")
+                   "CHANGE-ME!"))
+          (author (if (search-forward "#+author: " nil t)
+                      (progn
+                        (let ((point-bef (point-marker))
+                              (point-end (progn
+                                           (end-of-line)
+                                           (point-marker))))
+                          (buffer-substring-no-properties
+                           point-bef
+                           point-end)))
 
-(defun convert-img-link ()
+                    (error "ERROR - AUTHOR NOT FOUND!")
+                    "CHANGE-ME")))
+      (list title author))))
+
+(defun uni--convert-img-link ()
   "Convert path from the current file into /assets Jekyll forlder."
   (while (or (search-forward "![img](../img" nil t)
              (search-forward "![img](../../img" nil t))
@@ -250,9 +277,9 @@
 (defun uni-spawn-all-links ()
   "Spawn all links in the Markdown buffer."
   (interactive)
-  (spawn-post-links))
+  (uni--spawn-post-links))
 
-(defun spawn-post-links ()
+(defun uni--spawn-post-links ()
   "Spawn all posts links in jekyll project."
   (let ((file-list (directory-files-recursively
                     (file-name-directory (buffer-file-name))
@@ -286,67 +313,8 @@
                           link
                           " %})"
                           "\n")))))))
-      (if (buffer-modified-p) (save-buffer)))))
-
-;; HTML
-
-;; Buffer Dynamic export
-(defun unimanual-export-html (dir out)
-  "Export all org files to html from DIR to OUT."
-  (interactive
-   "DSelect a directory to export: \nDSelect the destination: ")
-  (setq-local org-publish-project-alist
-              `(("UniManual"
-                 :base-directory ,(format "%s" dir)
-                 :publishing-directory ,(format "%s" out)
-                 :publishing-function org-twbs-publish-to-html
-                 :with-sub-superscript nil
-                 :recursive t
-                 )))
-  ;; (org-publish-remove-all-timestamps) ;; overwrite old files
-  (org-publish-project "UniManual"))
-
-;; Convert snake_case org files to kebab-case
-(defun unimanual-apply-name-scheme (dir)
-  "Take all org files from DIR and rename it in kebab-case."
-  (interactive
-   "DSelect a directory to analyze: ")
-  (let ((files (uni-mark-format dir)))
-    (dolist (file files)
-      (let ((new-name (expand-file-name
-                       (uni-format-name
-                        (file-name-nondirectory file)))))
-        (uni-save-new-file-name file new-name)))))
-
-(defun uni-mark-format (dir)
-  "Find all .org files in DIR recursively and return it in a list."
-  (directory-files-recursively dir "\\.org$" t nil))
-
-(defun uni-format-name (name)
-  "Downcase and replace all _ with - in NAME."
-  (downcase (replace-regexp-in-string "_" "-" name)))
-
-(defun uni-save-new-file-name (old-file-name new-file-name)
-  "Compare OLD-FILE-NAME with NEW-FILE-NAME.
-If the name is different save it as NEW-FILE-NAME and change
-also the buffer name if exists."
-  (unless (string= old-file-name new-file-name)
-    (rename-file old-file-name new-file-name t)
-    (unless (not (bufferp (get-buffer
-                           (file-name-nondirectory old-file-name))))
-      (with-current-buffer (current-buffer)
-        (set-buffer (get-buffer
-                     (file-name-nondirectory old-file-name)))
-        (set-visited-file-name
-         (file-name-nondirectory new-file-name) t t)))))
-
-(defun unimanual-open-index-preview ()
-  "Open in Safari the UniManual index html."
-  (interactive)
-  (unless (not (string= "UniManual" (projectile-project-name)))
-    (let ((index-name (projectile-expand-root "docs/index.html")))
-      (browse-url-default-macosx-browser
-       (format "file://%s" index-name)))))
+      (save-buffer)
+      (kill-current-buffer))))
 
 (defun unimanual-view-current-file ()
   "Save and View in Safari the current file buffer already exported."
@@ -360,13 +328,6 @@ also the buffer name if exists."
     (uni-save-new-file-name file-name dest-name)
     (browse-url-default-macosx-browser
      (format "file://%s" dest-name))))
-
-(defun uni-change-path (file-path)
-  "Correct the FILE-PATH to docs."
-  (replace-regexp-in-string
-   "/UniManual/src"
-   "/UniManual/docs"
-   file-path))
 
 (provide 'unimanual-tools)
 ;;; unimanual-tools.el ends here
