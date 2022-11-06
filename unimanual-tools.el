@@ -259,9 +259,12 @@
                               (point-end (progn
                                            (end-of-line)
                                            (point-marker))))
-                          (buffer-substring-no-properties
-                           point-bef
-                           point-end)))
+                          (let ((names (buffer-substring-no-properties
+                                        point-bef
+                                        point-end)))
+                            (if (s-contains? "," names)
+                                (format "[ %s ]" names)
+                              names))))
 
                     (error "ERROR - AUTHOR NOT FOUND!")
                     "CHANGE-ME")))
@@ -274,6 +277,7 @@
     (beginning-of-line)
     (replace-match "![img](/assets/img")))
 
+;; TODO - fix link position if not found
 (defun uni-spawn-all-links ()
   "Spawn all links in the Markdown buffer."
   (interactive)
@@ -308,6 +312,7 @@
                                 "({% post_url "
                                 link
                                 " %})\n")))
+                  (goto-char (point-max))
                   (insert desc
                           "({% post_url "
                           link
